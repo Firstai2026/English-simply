@@ -1,6 +1,50 @@
 const VOICE_LANG = 'en-US';
 const cachedVoices = {};
 
+let audioMap = null;
+let audioMapPromise = null;
+
+function loadAudioMap() {
+  if (audioMap !== null) {
+    return Promise.resolve(audioMap);
+  }
+
+  if (audioMapPromise) {
+    return audioMapPromise;
+  }
+
+  audioMapPromise = fetch(`${import.meta.env.BASE_URL}audio/audio-map.json`)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Audio map HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      audioMap = data || {};
+      return audioMap;
+    })
+    .catch((error) => {
+      console.warn('Merriam-Webster audio map unavailable:', error);
+      audioMap = {};
+      return audioMap;
+    });
+
+  return audioMapPromise;
+}
+
+function getMerriamWebsterAudio(word) {
+  const normalized = String(word || '').trim().toLowerCase();
+
+  if (!normalized) {
+    return Promise.resolve(null);
+  }
+
+  return loadAudioMap().then((map) => {
+    return map[normalized] || null;
+  });
+}
+
 export function pickVoice(lang) {
   if (!window.speechSynthesis) return null;
   const prefix = lang.split('-')[0];
@@ -20,35 +64,80 @@ export function pickVoice(lang) {
 export function speakText(text, lang) {
   lang = lang || VOICE_LANG;
   return new Promise((resolve) => {
-    if (!window.speechSynthesis) { resolve(); return; }
+    if (!window.speechSynthesis) {
+      resolve();
+      return;
+    }
+
     window.speechSynthesis.cancel();
+
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = lang;
     utter.rate = 0.92;
+
     const prefix = lang.split('-')[0];
-    const v = cachedVoices[prefix] !== undefined ? cachedVoices[prefix] : pickVoice(lang);
+    const v =
+      cachedVoices[prefix] !== undefined
+        ? cachedVoices[prefix]
+        : pickVoice(lang);
+
     if (v) utter.voice = v;
+
     let done = false;
-    const finish = () => { if (!done) { done = true; resolve(); } };
+
+    const finish = () => {
+      if (!done) {
+        done = true;
+        resolve();
+      }
+    };
+
     utter.onend = finish;
     utter.onerror = finish;
+
     window.speechSynthesis.speak(utter);
+
     setTimeout(finish, 4000);
   });
 }
 
-export function playPronunciation(card, media) {
+function playAudio(url) {
   return new Promise((resolve) => {
-    if (media && media.audio) {
-      const a = new Audio(media.audio);
-      let done = false;
-      const finish = () => { if (!done) { done = true; resolve(); } };
-      a.onended = finish;
-      a.onerror = finish;
-      a.play().catch(finish);
-      setTimeout(finish, 6000);
-    } else {
-      speakText(card.front, VOICE_LANG).then(resolve);
+    if (!url) {
+      resolve();
+      return;
     }
+
+    const a = new Audio(url);
+
+    let done = false;
+
+    const finish = () => {
+      if (!done) {
+        done = true;
+        resolve();
+      }
+    };
+
+    a.onended = finish;
+    a.onerror = finish;
+
+    a.play().catch(finish);
+
+    setTimeout(finish, 6000);
+  });
+}
+
+export function playPronunciation(card, media) {
+  return getMerriamWebsterAudio(card.front).then((merriamAudio) => {
+    if (merriamAudio) {
+      return playAudio(merriamAudio);
+    }
+
+    if (media && media.audio) {
+      return playAudio(media.audio);
+    }
+
+    return speakText(card.front, VOICE_LANG);
   });
 }
