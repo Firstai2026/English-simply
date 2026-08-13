@@ -42,60 +42,101 @@ export default async function handler(req, res) {
   }
 
   try {
-    const apiUrl =
+    // Merriam-Webster: pronunciation
+    const merriamUrl =
       'https://www.dictionaryapi.com/api/v3/references/learners/json/' +
       encodeURIComponent(word) +
       '?key=' +
       encodeURIComponent(process.env.MERRIAM_KEY);
 
-    const response = await fetch(apiUrl);
-
-    if (!response.ok) {
-      return res.status(502).json({
-        error: `Merriam-Webster HTTP ${response.status}`
-      });
-    }
-
-    const data = await response.json();
+    const merriamResponse = await fetch(merriamUrl);
 
     let audio = null;
 
-    if (Array.isArray(data)) {
-      for (const entry of data) {
-        const pronunciations = entry?.hwi?.prs;
+    if (merriamResponse.ok) {
+      const data = await merriamResponse.json();
 
-        if (!Array.isArray(pronunciations)) {
-          continue;
-        }
+      if (Array.isArray(data)) {
+        for (const entry of data) {
+          const pronunciations = entry?.hwi?.prs;
 
-        for (const pronunciation of pronunciations) {
-          const audioId = pronunciation?.sound?.audio;
-
-          if (!audioId) {
+          if (!Array.isArray(pronunciations)) {
             continue;
           }
 
-          const firstLetter = audioId.charAt(0).toLowerCase();
+          for (const pronunciation of pronunciations) {
+            const audioId = pronunciation?.sound?.audio;
 
-          audio =
-            'https://media.merriam-webster.com/audio/prons/en/us/mp3/' +
-            firstLetter +
-            '/' +
-            audioId +
-            '.mp3';
+            if (!audioId) {
+              continue;
+            }
 
-          break;
-        }
+            const firstLetter = audioId.charAt(0).toLowerCase();
 
-        if (audio) {
-          break;
+            audio =
+              'https://media.merriam-webster.com/audio/prons/en/us/mp3/' +
+              firstLetter +
+              '/' +
+              audioId +
+              '.mp3';
+
+            break;
+          }
+
+          if (audio) {
+            break;
+          }
         }
       }
     }
 
+    // Dictionary API: examples
+    const dictionaryUrl =
+      'https://api.dictionaryapi.dev/api/v2/entries/en/' +
+      encodeURIComponent(word);
+
+    const dictionaryResponse = await fetch(dictionaryUrl);
+
+    let examples = [];
+    let notFound = false;
+
+    if (dictionaryResponse.status === 404) {
+      notFound = true;
+    } else if (dictionaryResponse.ok) {
+      const dictionaryData = await dictionaryResponse.json();
+
+      if (Array.isArray(dictionaryData)) {
+        for (const entry of dictionaryData) {
+          const meanings = entry?.meanings;
+
+          if (!Array.isArray(meanings)) {
+            continue;
+          }
+
+          for (const meaning of meanings) {
+            const definitions = meaning?.definitions;
+
+            if (!Array.isArray(definitions)) {
+              continue;
+            }
+
+            for (const definition of definitions) {
+              if (definition?.example) {
+                examples.push(definition.example);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    examples = [...new Set(examples)];
+
     return res.status(200).json({
       word,
-      audio
+      audio,
+      examples,
+      notFound
     });
   } catch (error) {
     return res.status(500).json({
