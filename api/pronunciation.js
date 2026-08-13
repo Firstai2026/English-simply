@@ -1,18 +1,27 @@
 export default async function handler(req, res) {
-  // Разрешаем запросы с GitHub Pages
-  res.setHeader('Access-Control-Allow-Origin', 'https://firstai2026.github.io');
+  const origin = req.headers.origin;
+
+  const allowedOrigins = [
+    'https://firstai2026.github.io',
+    'http://127.0.0.1:5173',
+    'http://localhost:5173'
+  ];
+
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Ответ на CORS preflight
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
 
-  // Разрешаем только GET
   if (req.method !== 'GET') {
     return res.status(405).json({
-      error: 'Method not allowed',
+      error: 'Method not allowed'
     });
   }
 
@@ -22,13 +31,13 @@ export default async function handler(req, res) {
 
   if (!word) {
     return res.status(400).json({
-      error: 'Missing word',
+      error: 'Missing word'
     });
   }
 
   if (!process.env.MERRIAM_KEY) {
     return res.status(500).json({
-      error: 'MERRIAM_KEY is not configured',
+      error: 'MERRIAM_KEY is not configured'
     });
   }
 
@@ -43,7 +52,7 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       return res.status(502).json({
-        error: `Merriam-Webster HTTP ${response.status}`,
+        error: `Merriam-Webster HTTP ${response.status}`
       });
     }
 
@@ -86,11 +95,11 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       word,
-      audio,
+      audio
     });
   } catch (error) {
     return res.status(500).json({
-      error: error.message || 'Request failed',
+      error: error.message || 'Request failed'
     });
   }
 }
