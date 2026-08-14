@@ -5,7 +5,7 @@ import { shuffleArr } from '../utils/helpers.js';
 import { storageGet } from '../utils/storage.js';
 import { playPronunciation, speakText } from '../utils/voice.js';
 
-export function ListeningGame({ pool, onExit }) {
+export function ListeningGame({ pool, onExit, onReview }) {
   const [queue, setQueue] = useState([]);
   const [ready, setReady] = useState(false);
   const [doneCount, setDoneCount] = useState(0);

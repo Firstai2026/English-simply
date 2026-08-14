@@ -5,7 +5,7 @@ import { shuffleArr } from '../utils/helpers.js';
 import { storageGet } from '../utils/storage.js';
 import { playPronunciation } from '../utils/voice.js';
 
-export function MatchGame({ gameCards, distractorCards = [], onExit }) {
+export function MatchGame({ gameCards, distractorCards = [], onExit, onReview }) {
   const [leftOrder, setLeftOrder] = useState([]);
   const [rightOrder, setRightOrder] = useState([]);
   const [selectedLeft, setSelectedLeft] = useState(null);

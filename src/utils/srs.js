@@ -41,8 +41,77 @@ export function reviewSide(sideState, knew) {
 
 export function reviewCard(card, knew, direction) {
   const wrongCount = (card.wrongCount || 0) + (knew ? 0 : 1);
+
+  let problemActive = !!card.problemActive;
+  let problemResolved = !!card.problemResolved;
+
+  let problemForwardCorrect = card.problemForwardCorrect || 0;
+  let problemReverseCorrect = card.problemReverseCorrect || 0;
+
+  let problemForwardWrong = card.problemForwardWrong || 0;
+  let problemReverseWrong = card.problemReverseWrong || 0;
+
   if (direction === 'reverse') {
-    return { ...card, wrongCount, srsReverse: reviewSide(card.srsReverse, knew) };
+    if (knew) {
+      problemReverseCorrect += 1;
+      problemReverseWrong = 0;
+    } else {
+      problemReverseCorrect = 0;
+      problemReverseWrong += 1;
+    }
+  } else {
+    if (knew) {
+      problemForwardCorrect += 1;
+      problemForwardWrong = 0;
+    } else {
+      problemForwardCorrect = 0;
+      problemForwardWrong += 1;
+    }
   }
-  return { ...card, wrongCount, srs: reviewSide(card.srs, knew) };
+
+  if (!problemResolved && !problemActive && !knew) {
+    problemActive = true;
+  }
+
+  if (problemActive) {
+    const forwardSolved = problemForwardCorrect >= 3;
+    const reverseSolved = problemReverseCorrect >= 3;
+
+    if (forwardSolved && reverseSolved) {
+      problemActive = false;
+      problemResolved = true;
+    }
+  } else if (problemResolved && knew === false) {
+    const forwardRelapse = direction !== 'reverse' && problemForwardWrong >= 2;
+    const reverseRelapse = direction === 'reverse' && problemReverseWrong >= 2;
+
+    if (forwardRelapse || reverseRelapse) {
+      problemActive = true;
+    }
+  }
+
+  const problemData = {
+    problemActive,
+    problemResolved,
+    problemForwardCorrect,
+    problemReverseCorrect,
+    problemForwardWrong,
+    problemReverseWrong,
+  };
+
+  if (direction === 'reverse') {
+    return {
+      ...card,
+      wrongCount,
+      ...problemData,
+      srsReverse: reviewSide(card.srsReverse, knew),
+    };
+  }
+
+  return {
+    ...card,
+    wrongCount,
+    ...problemData,
+    srs: reviewSide(card.srs, knew),
+  };
 }

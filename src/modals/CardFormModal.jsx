@@ -123,36 +123,60 @@ export function CardFormModal({ deckId, editingCard, existingCards = [], onSave,
   }
 
   async function handleDictLookup() {
-    if (!front.trim() || dictLoading) return;
-    setDictLoading(true);
-    setDictError(null);
-    try {
-      const { examples, audio, notFound } = await fetchDictionaryData(front);
-      if (notFound) {
-        setDictError('notfound');
-        setDictExamples([]);
-      } else {
-        setDictExamples(examples);
-        setDictIndex(0);
-        if (examples.length > 0 && !exampleEn.trim()) {
-          setExampleEn(examples[0]);
-        }
-        if (audio && !audioPreview) {
-          setAudioPreview(audio);
-          setAudioUrl(audio);
-          setAudioFile(null);
-          setAudioFromDict(true);
-          setAudioCleared(false);
-        }
-        if (examples.length === 0 && !audio) setDictError('empty');
-      }
-    } catch (e) {
-      console.error('Dictionary lookup failed', e);
-      setDictError('error');
-    } finally {
-      setDictLoading(false);
+  if (!front.trim() || dictLoading) return;
+
+  setDictLoading(true);
+  setDictError(null);
+
+  try {
+    const response = await fetch(
+      `https://english-simply.vercel.app/api/pronunciation?word=${encodeURIComponent(front.trim())}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Pronunciation API HTTP ${response.status}`);
     }
+
+    const result = await response.json();
+
+    const examples = Array.isArray(result.examples)
+      ? result.examples
+      : [];
+
+    const audio = result.audio || null;
+    const notFound = !!result.notFound;
+
+    if (notFound && !audio && examples.length === 0) {
+      setDictError('notfound');
+      setDictExamples([]);
+      return;
+    }
+
+    setDictExamples(examples);
+    setDictIndex(0);
+
+    if (examples.length > 0 && !exampleEn.trim()) {
+      setExampleEn(examples[0]);
+    }
+
+    if (audio) {
+      setAudioPreview(audio);
+      setAudioUrl(audio);
+      setAudioFile(null);
+      setAudioFromDict(true);
+      setAudioCleared(false);
+    }
+
+    if (examples.length === 0 && !audio) {
+      setDictError('empty');
+    }
+  } catch (e) {
+    console.error('Dictionary lookup failed', e);
+    setDictError('error');
+  } finally {
+    setDictLoading(false);
   }
+}
 
   function cycleExample() {
     if (dictExamples.length === 0) return;

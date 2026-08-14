@@ -23,6 +23,7 @@ export default function App() {
   const [currentDeckId, setCurrentDeckId] = useState(null);
   const [studyQueue, setStudyQueue] = useState([]);
   const [studyIndex, setStudyIndex] = useState(0);
+  const [practiceMixed, setPracticeMixed] = useState(false);
   const [flipped, setFlipped] = useState(false);
   const [mediaCache, setMediaCache] = useState({});
   const [streak, setStreak] = useState({ count: 0, lastDate: null });
@@ -82,11 +83,14 @@ export default function App() {
   }, [cards]);
 
   const problemWords = useMemo(() => {
-    return [...cards]
-      .filter(c => (c.wrongCount || 0) > 0)
-      .sort((a, b) => (b.wrongCount || 0) - (a.wrongCount || 0));
-  }, [cards]);
-
+  return [...cards]
+    .filter(
+  c =>
+    c.problemActive === true ||
+    (c.problemActive === undefined && (c.wrongCount || 0) > 0)
+)
+    .sort((a, b) => (b.wrongCount || 0) - (a.wrongCount || 0));
+}, [cards]);
   /* ---------- Load media for current study card ---------- */
 
   useEffect(() => {
@@ -163,16 +167,18 @@ export default function App() {
   /* ---------- Practice ---------- */
 
   function startPractice() {
-    setView('practice');
-  }
+  setPracticeMixed(false);
+  setView('practice');
+}
 
-  function startMixedFromStats() {
-    if (currentDeckId) {
-      setView('practice');
-    } else {
-      setView('decks');
-    }
+function startMixedFromStats() {
+  if (currentDeckId && problemWords.length > 0) {
+    setPracticeMixed(true);
+    setView('practice');
+  } else {
+    setView('decks');
   }
+}
 
   /* ---------- Games ---------- */
 
@@ -217,83 +223,123 @@ export default function App() {
   /* ---------- Card CRUD ---------- */
 
   async function saveCard(data, mediaInfo) {
-    let cardId;
-    if (editingCard) {
-      cardId = editingCard.id;
-      setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...data } : c));
-    } else {
-      cardId = uid();
-      const newCard = {
-        id: cardId,
-        deckId: currentDeckId,
-        ...data,
-        hasImage: false,
-        hasAudio: false,
-        wrongCount: 0,
-        srs: null,
-        srsReverse: null,
-      };
-      setCards(prev => [...prev, newCard]);
-    }
+  let cardId;
+
+  if (editingCard) {
+    cardId = editingCard.id;
+
+    setCards(prev =>
+      prev.map(c =>
+        c.id === cardId ? { ...c, ...data } : c
+      )
+    );
+  } else {
+    cardId = uid();
+
+    const newCard = {
+      id: cardId,
+      deckId: currentDeckId,
+      ...data,
+      hasImage: false,
+      hasAudio: false,
+      wrongCount: 0,
+      srs: null,
+      srsReverse: null,
+    };
+
+    setCards(prev => [...prev, newCard]);
+
+}
+
     await saveMedia(cardId, mediaInfo);
-    setShowCardModal(false);
-    setEditingCard(null);
+  setShowCardModal(false);
+  setEditingCard(null);
+}
+
+async function saveMedia(cardId, mediaInfo) {
+  let media = {};
+  const existingRaw = await storageGet('media:' + cardId);
+
+  if (existingRaw) {
+    media = JSON.parse(existingRaw);
   }
 
-  async function saveMedia(cardId, mediaInfo) {
-    let media = {};
-    const existingRaw = await storageGet('media:' + cardId);
-    if (existingRaw) media = JSON.parse(existingRaw);
-
-    if (mediaInfo.clearImage) {
-      delete media.image;
-    } else if (mediaInfo.image) {
-      media.image = await resizeImageFile(mediaInfo.image);
-    }
-
-    if (mediaInfo.clearAudio) {
-      delete media.audio;
-    } else if (mediaInfo.audio) {
-      media.audio = await fileToDataUrl(mediaInfo.audio);
-    } else if (mediaInfo.audioUrl) {
-      media.audio = mediaInfo.audioUrl;
-    }
-
-    if (Object.keys(media).length > 0) {
-      await storageSet('media:' + cardId, JSON.stringify(media));
-    } else {
-      await storageDelete('media:' + cardId);
-    }
-
-    setCards(prev => prev.map(c =>
-      c.id === cardId ? { ...c, hasImage: !!media.image, hasAudio: !!media.audio } : c
-    ));
+  if (mediaInfo.clearImage) {
+    delete media.image;
+  } else if (mediaInfo.image) {
+    media.image = await resizeImageFile(mediaInfo.image);
   }
 
-  function deleteCard(cardId) {
-    storageDelete('media:' + cardId);
-    setCards(prev => prev.filter(c => c.id !== cardId));
+  if (mediaInfo.clearAudio) {
+    delete media.audio;
+  } else if (mediaInfo.audio) {
+    media.audio = await fileToDataUrl(mediaInfo.audio);
+  } else if (mediaInfo.audioUrl) {
+    media.audio = mediaInfo.audioUrl;
   }
 
-  function resetCard(cardId) {
-    setCards(prev => prev.map(c =>
-      c.id === cardId ? { ...c, srs: null, srsReverse: null, wrongCount: 0 } : c
-    ));
+  if (Object.keys(media).length > 0) {
+    await storageSet('media:' + cardId, JSON.stringify(media));
+  } else {
+    await storageDelete('media:' + cardId);
   }
 
-  function forceDue(cardId) {
-    setCards(prev => prev.map(c =>
-      c.id === cardId ? { ...c, srs: null, srsReverse: null } : c
-    ));
-    const card = cards.find(c => c.id === cardId);
-    if (card) {
-      setStudyQueue([{ ...card, dir: 'forward' }]);
-      setStudyIndex(0);
-      setFlipped(false);
-      setSessionReviewed(0);
-      setView('study');
-    }
+  setCards(prev =>
+    prev.map(c =>
+      c.id === cardId
+        ? {
+            ...c,
+            hasImage: !!media.image,
+            hasAudio: !!media.audio,
+          }
+        : c
+    )
+  );
+}
+
+function deleteCard(cardId) {
+  storageDelete('media:' + cardId);
+  setCards(prev => prev.filter(c => c.id !== cardId));
+}
+
+function resetCard(cardId) {
+  setCards(prev =>
+    prev.map(c =>
+      c.id === cardId
+        ? {
+            ...c,
+            srs: null,
+            srsReverse: null,
+            wrongCount: 0,
+          }
+        : c
+    )
+  );
+}
+
+function forceDue(cardId) {
+  setCards(prev =>
+    prev.map(c =>
+      c.id === cardId
+        ? {
+            ...c,
+            srs: null,
+            srsReverse: null,
+          }
+        : c
+    )
+  );
+
+  const card = cards.find(c => c.id === cardId);
+
+  if (card) {
+    setStudyQueue([{ ...card, dir: 'forward' }]);
+    setStudyIndex(0);
+    setFlipped(false);
+    setSessionReviewed(0);
+    setView('study');
   }
+}
 
   /* ---------- Export / Import ---------- */
 
@@ -396,12 +442,13 @@ export default function App() {
       )}
 
       {view === 'practice' && (
-        <MixedPractice
-          pool={deckCards}
-          applyReview={applyReview}
-          onExit={() => { updateStreak(); setView('deck'); }}
-        />
-      )}
+     <MixedPractice
+    pool={practiceMixed ? problemWords : deckCards}
+    mixed={practiceMixed}
+    applyReview={applyReview}
+    onExit={() => { updateStreak(); setView('deck'); }}
+  />
+)}
 
       {view === 'match' && (
         <>

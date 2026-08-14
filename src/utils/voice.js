@@ -101,6 +101,8 @@ export function speakText(text, lang) {
   });
 }
 
+let currentAudio = null;
+
 function playAudio(url) {
   return new Promise((resolve) => {
     if (!url) {
@@ -108,13 +110,25 @@ function playAudio(url) {
       return;
     }
 
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio = null;
+    }
+
     const a = new Audio(url);
+    currentAudio = a;
 
     let done = false;
 
     const finish = () => {
       if (!done) {
         done = true;
+
+        if (currentAudio === a) {
+          currentAudio = null;
+        }
+
         resolve();
       }
     };

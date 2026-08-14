@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../components/Icon.jsx';
 import { StudyView } from '../study/StudyView.jsx';
 import { ListeningGame } from './ListeningGame.jsx';
@@ -6,7 +6,8 @@ import { MatchGame } from './MatchGame.jsx';
 import { shuffleArr } from '../utils/helpers.js';
 import { storageGet } from '../utils/storage.js';
 
-export function MixedPractice({ pool, applyReview, onExit }) {
+export function MixedPractice({ pool, mixed, applyReview, onExit }) {
+  const practicePoolRef = useRef(pool);
   const [steps, setSteps] = useState([]);
   const [stepIndex, setStepIndex] = useState(0);
   const [batchQueue, setBatchQueue] = useState([]);
@@ -14,27 +15,134 @@ export function MixedPractice({ pool, applyReview, onExit }) {
   const [batchFlipped, setBatchFlipped] = useState(false);
   const [mediaCache, setMediaCache] = useState({});
 
-  useEffect(() => {
-    const shuffled = shuffleArr(pool);
-    const chunkSize = 3;
-    const chunks = [];
-    for (let i = 0; i < shuffled.length; i += chunkSize) {
-      chunks.push(shuffled.slice(i, i + chunkSize));
-    }
-    const built = [];
-    chunks.forEach((chunk, i) => {
-      built.push({ type: 'cards', items: chunk });
-      if (i < chunks.length - 1) {
-        const interludeWords = shuffleArr(pool).slice(0, Math.min(4, pool.length));
-        if (interludeWords.length >= 2) {
-          built.push(i % 2 === 0 ? { type: 'listening', words: interludeWords } : { type: 'match', words: interludeWords });
-        }
-      }
-    });
-    setSteps(built);
-    setStepIndex(0);
-  }, [pool]);
+ useEffect(() => {
+  const practicePool = practicePoolRef.current;
 
+  if (!practicePool.length) {
+    setSteps([]);
+    setStepIndex(0);
+    return;
+  }
+
+  const shuffled = shuffleArr(practicePool);
+
+  // Обычный режим: только карточки
+  if (!mixed) {
+    const chunks = [];
+    let index = 0;
+
+    while (index < shuffled.length) {
+      const remaining = shuffled.length - index;
+
+      let minSize;
+      let maxSize;
+
+      if (shuffled.length <= 3) {
+        minSize = 1;
+        maxSize = Math.min(2, remaining);
+      } else if (shuffled.length <= 6) {
+        minSize = 2;
+        maxSize = Math.min(3, remaining);
+      } else if (shuffled.length <= 10) {
+        minSize = 2;
+        maxSize = Math.min(4, remaining);
+      } else {
+        minSize = 3;
+        maxSize = Math.min(6, remaining);
+      }
+
+      if (minSize > remaining) minSize = remaining;
+
+      const size =
+        minSize +
+        Math.floor(Math.random() * (maxSize - minSize + 1));
+
+      chunks.push({
+        type: 'cards',
+        items: shuffled.slice(index, index + size),
+      });
+
+      index += size;
+    }
+
+    setSteps(chunks);
+    setStepIndex(0);
+    return;
+  }
+
+  // Смешанный режим проблемных слов
+  const built = [];
+  let index = 0;
+  let lastExercise = null;
+
+  while (index < shuffled.length) {
+    const remaining = shuffled.length - index;
+
+    let minSize;
+    let maxSize;
+
+    if (shuffled.length <= 3) {
+      minSize = 1;
+      maxSize = Math.min(2, remaining);
+    } else if (shuffled.length <= 6) {
+      minSize = 1;
+      maxSize = Math.min(3, remaining);
+    } else if (shuffled.length <= 10) {
+      minSize = 2;
+      maxSize = Math.min(4, remaining);
+    } else {
+      minSize = 3;
+      maxSize = Math.min(6, remaining);
+    }
+
+    if (minSize > remaining) minSize = remaining;
+
+    const size =
+      minSize +
+      Math.floor(Math.random() * (maxSize - minSize + 1));
+
+    const chunk = shuffled.slice(index, index + size);
+
+    built.push({
+      type: 'cards',
+      items: chunk,
+    });
+
+    index += size;
+
+    // После блока карточек иногда вставляем упражнение.
+    if (index < shuffled.length) {
+      let exercise;
+
+      if (lastExercise === 'listening') {
+        exercise = 'match';
+      } else if (lastExercise === 'match') {
+        exercise = 'listening';
+      } else {
+        exercise = Math.random() < 0.5 ? 'listening' : 'match';
+      }
+
+      const exerciseWords = shuffleArr(practicePool).slice(
+        0,
+        Math.min(4, practicePool.length)
+      );
+
+      if (exerciseWords.length >= 2) {
+        built.push(
+          exercise === 'listening'
+            ? { type: 'listening', words: exerciseWords }
+            : { type: 'match', words: exerciseWords }
+        );
+
+        lastExercise = exercise;
+      }
+    }
+  }
+
+  setSteps(built);
+  setStepIndex(0);
+}, []);
+  
   const currentStep = steps[stepIndex];
 
   useEffect(() => {
@@ -119,7 +227,15 @@ export function MixedPractice({ pool, applyReview, onExit }) {
     return (
       <div>
         <p className="text-xs text-center pt-4" style={{ color: 'var(--ink-faint)' }}>{progressLabel} · на слух</p>
-        <ListeningGame pool={currentStep.words} onExit={nextStep} />
+        <ListeningGame
+  pool={currentStep.words}
+  onExit={onExit}
+  onReview={(cardId, direction, knew) => {
+    if (mixed) {
+      applyReview(cardId, direction, knew);
+    }
+  }}
+/>
       </div>
     );
   }
@@ -128,7 +244,16 @@ export function MixedPractice({ pool, applyReview, onExit }) {
     return (
       <div>
         <p className="text-xs text-center pt-4" style={{ color: 'var(--ink-faint)' }}>{progressLabel} · связки слов</p>
-        <MatchGame gameCards={currentStep.words} distractorCards={[]} onExit={nextStep} />
+       <MatchGame
+  gameCards={currentStep.words}
+  distractorCards={[]}
+  onExit={nextStep}
+  onReview={(cardId, direction, knew) => {
+    if (mixed) {
+      applyReview(cardId, direction, knew);
+    }
+  }}
+/>
       </div>
     );
   }
