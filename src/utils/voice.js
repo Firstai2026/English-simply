@@ -142,16 +142,48 @@ function playAudio(url) {
   });
 }
 
+function getDictionaryApiAudio(word) {
+  const normalized = String(word || '').trim().toLowerCase();
+
+  if (!normalized) {
+    return Promise.resolve(null);
+  }
+
+  return fetch(
+    `${import.meta.env.VITE_API_BASE_URL || ''}/api/dictionary-audio?word=${encodeURIComponent(normalized)}`
+  )
+    .then((response) => {
+      if (!response.ok) {
+        return null;
+      }
+      return response.json();
+    })
+    .then((data) => {
+      return data && data.audio ? data.audio : null;
+    })
+    .catch(() => null);
+}
+
 export function playPronunciation(card, media) {
-  return getMerriamWebsterAudio(card.front).then((merriamAudio) => {
-    if (merriamAudio) {
-      return playAudio(merriamAudio);
-    }
+  const word = String(card?.front || '').trim();
 
-    if (media && media.audio) {
-      return playAudio(media.audio);
-    }
+  return getMerriamWebsterAudio(word)
+    .then((merriamAudio) => {
+      if (merriamAudio) {
+        return playAudio(merriamAudio);
+      }
 
-    return speakText(card.front, VOICE_LANG);
-  });
+      return getDictionaryApiAudio(word);
+    })
+    .then((dictionaryAudio) => {
+      if (dictionaryAudio) {
+        return playAudio(dictionaryAudio);
+      }
+
+      if (media && media.audio) {
+        return playAudio(media.audio);
+      }
+
+      return speakText(word, VOICE_LANG);
+    });
 }
