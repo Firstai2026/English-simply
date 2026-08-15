@@ -163,9 +163,73 @@ function getDictionaryApiAudio(word) {
     })
     .catch(() => null);
 }
+export async function getPronunciationSources(word) {
+  const normalized = String(word || '').trim().toLowerCase();
 
+  if (!normalized) {
+    return [];
+  }
+
+  const sources = [];
+
+  const merriamAudio = await getMerriamWebsterAudio(normalized);
+
+  if (merriamAudio) {
+    sources.push({
+      id: 'merriam',
+      label: 'Merriam-Webster',
+      audio: merriamAudio,
+    });
+  }
+
+  const dictionaryAudio = await getDictionaryApiAudio(normalized);
+
+  if (dictionaryAudio) {
+    sources.push({
+      id: 'dictionary',
+      label: 'Dictionary API',
+      audio: dictionaryAudio,
+    });
+  }
+  return sources;
+}
+
+export function playPronunciationSource(source, word) {
+  if (!source) {
+    return Promise.resolve();
+  }
+
+  if (source.id === 'tts') {
+    return speakText(word, VOICE_LANG);
+  }
+
+  return playAudio(source.audio);
+}
 export function playPronunciation(card, media) {
   const word = String(card?.front || '').trim();
+  const selectedSource = card?.audioSource;
+
+  if (selectedSource === 'merriam') {
+    return getMerriamWebsterAudio(word)
+      .then((audio) => {
+        if (audio) {
+          return playAudio(audio);
+        }
+
+        return speakText(word, VOICE_LANG);
+      });
+  }
+
+  if (selectedSource === 'dictionary') {
+    return getDictionaryApiAudio(word)
+      .then((audio) => {
+        if (audio) {
+          return playAudio(audio);
+        }
+
+        return speakText(word, VOICE_LANG);
+      });
+  }
 
   return getMerriamWebsterAudio(word)
     .then((merriamAudio) => {

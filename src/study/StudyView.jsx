@@ -2,7 +2,17 @@ import { Icon } from '../components/Icon.jsx';
 import { IconBtn } from '../components/IconBtn.jsx';
 import { StudyCard } from './StudyCard.jsx';
 
-export function StudyView({ card, media, direction, flipped, onFlip, onAnswer, progress, onExit }) {
+export function StudyView({
+  card,
+  media,
+  direction,
+  flipped,
+  onFlip,
+  onAnswer,
+  onAudioSourceChange,
+  progress,
+  onExit,
+}) {
   return (
     <div className="px-5 pb-8 flex flex-col" style={{ minHeight: '70vh' }}>
       <div className="flex items-center justify-between mb-6">
@@ -14,7 +24,7 @@ export function StudyView({ card, media, direction, flipped, onFlip, onAnswer, p
       </div>
 
       <div className="flex-1 flex items-center">
-        <StudyCard card={card} media={media} direction={direction} flipped={flipped} onFlip={onFlip} onAnswer={onAnswer} />
+        <StudyCard card={card} media={media} direction={direction} flipped={flipped} onFlip={onFlip} onAnswer={onAnswer} onAudioSourceChange={onAudioSourceChange}/>
       </div>
 
       <div className="flex items-center justify-center gap-4 mt-8">

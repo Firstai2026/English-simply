@@ -255,6 +255,15 @@ function startMixedFromStats() {
   setShowCardModal(false);
   setEditingCard(null);
 }
+  function updateAudioSource(cardId, source) {
+  setCards(prev =>
+    prev.map(c =>
+      c.id === cardId
+        ? { ...c, audioSource: source }
+        : c
+    )
+  );
+}
 
 async function saveMedia(cardId, mediaInfo) {
   let media = {};
@@ -436,6 +445,7 @@ function forceDue(cardId) {
           flipped={flipped}
           onFlip={() => setFlipped(f => !f)}
           onAnswer={handleStudyAnswer}
+          onAudioSourceChange={updateAudioSource}
           progress={`${studyIndex + 1} / ${studyQueue.length}`}
           onExit={() => setView('deck')}
         />
