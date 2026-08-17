@@ -79,7 +79,7 @@ export function DeckView({ deck, deckCards, onStartStudy, onStartPractice, onSta
         </button>
       )}
 
-      {deckCards.length >= 8 && (
+      {deckCards.length >= 6 && (
         <button
           onClick={() => onStartMatch(true)}
           className="dc-btn w-full py-3 text-sm mb-3 flex items-center justify-center gap-2"
@@ -89,7 +89,7 @@ export function DeckView({ deck, deckCards, onStartStudy, onStartPractice, onSta
         </button>
       )}
 
-      {deckCards.length >= 4 && (
+      {deckCards.length >= 8 && (
         <button
           onClick={onStartMatchChoice}
           className="dc-btn w-full py-3 text-sm mb-5 flex items-center justify-center gap-2"
