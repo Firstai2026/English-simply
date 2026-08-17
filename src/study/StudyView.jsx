@@ -9,7 +9,6 @@ export function StudyView({
   flipped,
   onFlip,
   onAnswer,
-  onAudioSourceChange,
   progress,
   onExit,
 }) {
@@ -24,7 +23,14 @@ export function StudyView({
       </div>
 
       <div className="flex-1 flex items-center">
-        <StudyCard card={card} media={media} direction={direction} flipped={flipped} onFlip={onFlip} onAnswer={onAnswer} onAudioSourceChange={onAudioSourceChange}/>
+       <StudyCard
+       card={card}
+       media={media}
+       direction={direction}
+       flipped={flipped}
+       onFlip={onFlip}
+       onAnswer={onAnswer}
+/>
       </div>
 
       <div className="flex items-center justify-center gap-4 mt-8">

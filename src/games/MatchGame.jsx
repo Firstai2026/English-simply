@@ -47,10 +47,10 @@ export function MatchGame({ gameCards, distractorCards = [], onExit, onReview })
   function pick(id, side) {
     if (matchedIds[id] || wrongPair) return;
     if (side === 'left') {
-      if (isHard) {
+      
         const card = gameCards.find((c) => c.id === id);
         if (card) playPronunciation(card, mediaCache[id]);
-      }
+      
       setSelectedLeft(id);
       if (selectedRight != null) evaluate(id, selectedRight);
     } else {

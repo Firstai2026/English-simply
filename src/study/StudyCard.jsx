@@ -1,11 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Icon } from '../components/Icon.jsx';
-import {
-  getPronunciationSources,
-  playPronunciation,
-  playPronunciationSource,
-} from '../utils/voice.js';
-
+import { playPronunciation } from '../utils/voice.js';
 export function StudyCard({
   card,
   media,
@@ -13,13 +8,9 @@ export function StudyCard({
   flipped,
   onFlip,
   onAnswer,
-  onAudioSourceChange,
-}) {
+  }) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const [audioSources, setAudioSources] = useState([]);
-  const [audioSourceIndex, setAudioSourceIndex] = useState(0);
-  const [audioSourcesLoading, setAudioSourcesLoading] = useState(false);
   const startX = useRef(0);
   const movedRef = useRef(false);
   const isReverse = direction === 'reverse';
@@ -28,58 +19,12 @@ export function StudyCard({
   const frontExample = isReverse ? card.exampleRu : card.exampleEn;
   const backExample = isReverse ? card.exampleEn : card.exampleRu;
   useEffect(() => {
-  let cancelled = false;
-
-  if (!card?.front || isReverse) {
-    setAudioSources([]);
-    setAudioSourceIndex(0);
-    return;
-  }
-
-  setAudioSourcesLoading(true);
-
-  getPronunciationSources(card.front)
-    .then((sources) => {
-      if (cancelled) return;
-
-      setAudioSources(sources);
-
-      const savedSource = card.audioSource;
-      const savedIndex = sources.findIndex(
-        (source) => source.id === savedSource
-      );
-
-      setAudioSourceIndex(savedIndex >= 0 ? savedIndex : 0);
-    })
-    .finally(() => {
-      if (!cancelled) {
-        setAudioSourcesLoading(false);
-      }
-    });
-
-  return () => {
-  cancelled = true;
-};
-}, [card.id, card.front, card.audioSource, isReverse]);
-
-useEffect(() => {
   if (!isReverse) playPronunciation(card, media);
 }, [card.id, direction]);
 
 useEffect(() => {
   if (isReverse && flipped) playPronunciation(card, media);
 }, [flipped]);
-
-function switchAudioSource() {
-  if (audioSources.length <= 1) return;
-
-  const nextIndex = (audioSourceIndex + 1) % audioSources.length;
-  const nextSource = audioSources[nextIndex];
-
-  setAudioSourceIndex(nextIndex);
-  onAudioSourceChange(card.id, nextSource.id);
-  playPronunciationSource(nextSource, card.front);
-}
 
 function getClientX(e) {
   if (typeof e.clientX === 'number') return e.clientX;
@@ -178,54 +123,25 @@ function fly(knew) {
           )}
           {!isReverse && (
   <div className="mt-5 flex items-center gap-2">
-    {audioSources.length > 1 && (
-      <button
-        className="dc-btn dc-tappable flex items-center justify-center"
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: '50%',
-          background: 'var(--accent-soft)',
-          color: 'var(--accent)',
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          switchAudioSource();
-        }}
-        onPointerDown={(e) => e.stopPropagation()}
-        aria-label="Следующий источник озвучки"
-      >
-        <span style={{ fontSize: 18 }}>›</span>
-      </button>
-    )}
-
     <button
-      className="dc-btn dc-tappable flex items-center justify-center"
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: '50%',
-        background: 'var(--accent-soft)',
-        color: 'var(--accent)',
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-
-        if (audioSources.length > 0) {
-          playPronunciationSource(
-            audioSources[audioSourceIndex],
-            card.front
-          );
-        } else {
-          playPronunciation(card, media);
-        }
-      }}
-      onPointerDown={(e) => e.stopPropagation()}
-      aria-label="Произнести"
-    >
-      <Icon name="volume2" size={20} />
-    </button>
-  </div>
+  className="dc-btn dc-tappable flex items-center justify-center"
+  style={{
+    width: 44,
+    height: 44,
+    borderRadius: '50%',
+    background: 'var(--accent-soft)',
+    color: 'var(--accent)',
+  }}
+  onClick={(e) => {
+    e.stopPropagation();
+    playPronunciation(card, media);
+  }}
+  onPointerDown={(e) => e.stopPropagation()}
+  aria-label="Произнести"
+>
+  <Icon name="volume2" size={20} />
+</button>
+</div>
 )}
           <p className="text-xs mt-6" style={{ color: 'var(--ink-faint)' }}>нажмите или смахните</p>
         </div>
@@ -234,17 +150,25 @@ function fly(knew) {
         <div className="flip-face flip-face-back dc-surface flex flex-col items-center justify-center p-6 text-center" style={{ boxShadow: '0 8px 30px rgba(28,27,41,0.06)' }}>
           <p className="dc-display font-semibold" style={{ fontSize: 26, color: 'var(--accent)' }}>{backText}</p>
           {isReverse && (
-            <button
-              className="dc-btn dc-tappable mt-3 flex items-center justify-center"
-              style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent)' }}
-              onClick={(e) => { e.stopPropagation(); playPronunciation(card, media); }}
-              onPointerDown={(e) => e.stopPropagation()}
-              aria-label="Произнести"
-            >
-              <Icon name="volume2" size={18} />
-            </button>
-          )}
-          {backExample && (
+  <button
+    className="dc-btn dc-tappable mt-3 flex items-center justify-center"
+    style={{
+      width: 40,
+      height: 40,
+      borderRadius: '50%',
+      background: 'var(--accent-soft)',
+      color: 'var(--accent)',
+    }}
+    onClick={(e) => {
+      e.stopPropagation();
+      playPronunciation(card, media);
+    }}
+  >
+    <Icon name="volume2" size={18} />
+  </button>
+)}
+
+{backExample && (
             <p className="text-sm mt-5" style={{ color: 'var(--ink-soft)', maxWidth: 280 }}>{backExample}</p>
           )}
         </div>

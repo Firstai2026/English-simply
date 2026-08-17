@@ -163,6 +163,30 @@ function getDictionaryApiAudio(word) {
     })
     .catch(() => null);
 }
+async function getWiktionaryUsAudio(word) {
+  const normalized = String(word || '').trim().toLowerCase();
+
+  if (!normalized) {
+    return Promise.resolve(null);
+  }
+
+  const fileName = `File:En-us-${normalized}.ogg`;
+
+  return fetch(
+    `https://api.wikimedia.org/core/v1/commons/file/${encodeURIComponent(fileName)}`
+  )
+    .then((response) => {
+      if (!response.ok) {
+        return null;
+      }
+
+      return response.json();
+    })
+    .then((data) => {
+      return data?.original?.url || null;
+    })
+    .catch(() => null);
+}
 export async function getPronunciationSources(word) {
   const normalized = String(word || '').trim().toLowerCase();
 
@@ -182,7 +206,16 @@ export async function getPronunciationSources(word) {
     });
   }
 
-  const dictionaryAudio = await getDictionaryApiAudio(normalized);
+  const wiktionaryAudio = await getWiktionaryUsAudio(normalized);
+
+if (wiktionaryAudio) {
+  sources.push({
+    id: 'wiktionary',
+    label: 'Wiktionary US',
+    audio: wiktionaryAudio,
+  });
+}
+const dictionaryAudio = await getDictionaryApiAudio(normalized);
 
   if (dictionaryAudio) {
     sources.push({
@@ -220,6 +253,16 @@ export function playPronunciation(card, media) {
       });
   }
 
+  if (selectedSource === 'wiktionary') {
+  return getWiktionaryUsAudio(word)
+    .then((audio) => {
+      if (audio) {
+        return playAudio(audio);
+      }
+
+      return speakText(word, VOICE_LANG);
+    });
+}
   if (selectedSource === 'dictionary') {
     return getDictionaryApiAudio(word)
       .then((audio) => {

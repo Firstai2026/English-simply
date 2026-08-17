@@ -8,6 +8,7 @@ import { storageGet } from '../utils/storage.js';
 
 export function MixedPractice({ pool, mixed, applyReview, onExit }) {
   const practicePoolRef = useRef(pool);
+  
   const [steps, setSteps] = useState([]);
   const [stepIndex, setStepIndex] = useState(0);
   const [batchQueue, setBatchQueue] = useState([]);
@@ -140,7 +141,7 @@ export function MixedPractice({ pool, mixed, applyReview, onExit }) {
   }
 
   setSteps(built);
-  setStepIndex(0);
+setStepIndex(0);
 }, []);
   
   const currentStep = steps[stepIndex];

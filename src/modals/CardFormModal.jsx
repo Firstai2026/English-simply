@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../components/Icon.jsx';
 import { IconBtn } from '../components/IconBtn.jsx';
 import { Modal } from '../components/Modal.jsx';
@@ -6,6 +6,7 @@ import { TextField } from '../components/TextField.jsx';
 import { storageGet } from '../utils/storage.js';
 import { fetchDictionaryData, fetchTranslation } from '../utils/api.js';
 import { fileToDataUrl } from '../utils/helpers.js';
+import { getPronunciationSources, playPronunciationSource } from '../utils/voice.js';
 
 export function CardFormModal({ deckId, editingCard, existingCards = [], onSave, onClose }) {
   const [front, setFront] = useState(editingCard ? editingCard.front : '');
@@ -30,6 +31,11 @@ export function CardFormModal({ deckId, editingCard, existingCards = [], onSave,
   const [audioUrl, setAudioUrl] = useState(null);
   const [audioCleared, setAudioCleared] = useState(false);
   const [audioFromDict, setAudioFromDict] = useState(false);
+ const [audioSource, setAudioSource] = useState(
+  editingCard ? editingCard.audioSource || 'merriam' : 'merriam'
+);
+
+const audioSourceRequestRef = useRef(0);
 
   const [loadingMedia, setLoadingMedia] = useState(!!editingCard);
 
@@ -122,6 +128,46 @@ export function CardFormModal({ deckId, editingCard, existingCards = [], onSave,
     setAudioCleared(true);
   }
 
+  async function handleAudioSourceChange(source) {
+  setAudioSource(source);
+
+  const word = front.trim();
+  if (!word) return;
+
+  if (source === 'tts') {
+    await playPronunciationSource({ id: 'tts' }, word);
+    return;
+  }
+
+  if (source === 'dictionary') {
+    const response = await fetch(
+      `/api/dictionary-audio?word=${encodeURIComponent(word)}`
+    );
+
+    const data = await response.json();
+    
+    if (data?.audio) {
+      setAudioPreview(data.audio);
+      setAudioUrl(data.audio);
+      setAudioFile(null);
+      setAudioFromDict(true);
+      setAudioCleared(false);
+    }
+
+    return;
+  }
+
+  const sources = await getPronunciationSources(word);
+  const selected = sources.find((item) => item.id === source);
+
+  if (selected?.audio) {
+    setAudioPreview(selected.audio);
+    setAudioUrl(selected.audio);
+    setAudioFile(null);
+    setAudioFromDict(false);
+    setAudioCleared(false);
+  }
+}
   async function handleDictLookup() {
   if (!front.trim() || dictLoading) return;
 
@@ -275,10 +321,37 @@ export function CardFormModal({ deckId, editingCard, existingCards = [], onSave,
 
       <div className="mb-4">
         <span className="text-sm" style={{ color: 'var(--ink-soft)' }}>Аудио произношения</span>
+        <div className="mt-2 flex items-center gap-2">
+  <span className="text-xs" style={{ color: 'var(--ink-faint)' }}>
+    Источник:
+  </span>
+
+  <select
+    value={audioSource}
+    onChange={(e) => handleAudioSourceChange(e.target.value)}
+    className="text-sm px-2 py-1"
+    style={{
+      background: 'var(--bg)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
+      color: 'var(--ink)',
+    }}
+  >
+    <option value="merriam">Merriam-Webster</option>
+    <option value="wiktionary">Wiktionary US</option>
+    <option value="dictionary">Dictionary API</option>
+    <option value="tts">Синтез речи</option>
+  </select>
+</div>
         <div className="mt-1 flex items-center gap-3">
           {audioPreview && !audioCleared ? (
             <div className="flex items-center gap-2">
-              <audio controls src={audioPreview} style={{ height: 32, maxWidth: 180 }} />
+              <audio
+  key={audioPreview}
+  controls
+  src={audioPreview}
+  style={{ height: 32, maxWidth: 180 }}
+/>
               <IconBtn label="Убрать аудио" size="sm" tone="ghost" onClick={clearAudio}>
                 <Icon name="x" size={14} />
               </IconBtn>
@@ -300,20 +373,26 @@ export function CardFormModal({ deckId, editingCard, existingCards = [], onSave,
         </p>
       </div>
 
-      <button
-        disabled={!canSave}
-        onClick={() =>
-          onSave(
-            { front: front.trim(), back: back.trim(), exampleEn: exampleEn.trim(), exampleRu: exampleRu.trim() },
-            {
-              image: imageFile,
-              clearImage: imageCleared && !imageFile,
-              audio: audioFile,
-              audioUrl: audioUrl,
-              clearAudio: audioCleared && !audioFile && !audioUrl,
-            }
-          )
-        }
+     <button
+     disabled={!canSave}
+     onClick={() =>
+    onSave(
+      {
+        front: front.trim(),
+        back: back.trim(),
+        exampleEn: exampleEn.trim(),
+        exampleRu: exampleRu.trim(),
+        audioSource,
+      },
+      {
+        image: imageFile,
+        clearImage: imageCleared && !imageFile,
+        audio: audioFile,
+        audioUrl: audioUrl,
+        clearAudio: audioCleared && !audioFile && !audioUrl,
+      }
+    )
+  }
         className="dc-btn w-full py-3 text-sm"
         style={{ background: 'var(--accent)', color: '#fff', opacity: canSave ? 1 : 0.5 }}
       >
