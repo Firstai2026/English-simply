@@ -4,7 +4,7 @@ import { IconBtn } from '../components/IconBtn.jsx';
 import { Modal } from '../components/Modal.jsx';
 import { TextField } from '../components/TextField.jsx';
 import { storageGet } from '../utils/storage.js';
-import { fetchDictionaryData, fetchTranslation } from '../utils/api.js';
+import { fetchDictionaryData, fetchTranslation, fetchTranslationRuEn } from '../utils/api.js';
 import { fileToDataUrl } from '../utils/helpers.js';
 import { getPronunciationSources, playPronunciationSource } from '../utils/voice.js';
 
@@ -48,6 +48,7 @@ const audioSourceRequestRef = useRef(0);
   const [translatingExample, setTranslatingExample] = useState(false);
   const [backAutoFilled, setBackAutoFilled] = useState(false);
   const [exampleRuAutoFilled, setExampleRuAutoFilled] = useState(false);
+  const isRussianInput = /[а-яёА-ЯЁ]/.test(front.trim());
 
   function handleBackChange(v) {
     setBack(v);
@@ -66,7 +67,10 @@ const audioSourceRequestRef = useRef(0);
         if (raw) {
           const m = JSON.parse(raw);
           if (m.image) setImagePreview(m.image);
-          if (m.audio) setAudioPreview(m.audio);
+          if (m.audio) {
+            setAudioPreview(m.audio);
+            setAudioUrl(m.audio);
+          }
         }
         setLoadingMedia(false);
       });
@@ -78,7 +82,9 @@ const audioSourceRequestRef = useRef(0);
     if (!front.trim() || (back.trim() && !backAutoFilled)) return;
     const timer = setTimeout(async () => {
       setTranslating(true);
-      const translated = await fetchTranslation(front);
+      const translated = isRussianInput
+  ? await fetchTranslationRuEn(front)
+  : await fetchTranslation(front);
       setTranslating(false);
       if (translated) {
         setBack(translated);
@@ -86,7 +92,27 @@ const audioSourceRequestRef = useRef(0);
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [front]);
+  }, [front, isRussianInput]);
+    useEffect(() => {
+    if (!back.trim() || front.trim()) return;
+
+    const isRussianBack = /[а-яёА-ЯЁ]/.test(back.trim());
+    if (!isRussianBack) return;
+
+    const timer = setTimeout(async () => {
+      setTranslating(true);
+
+      const translated = await fetchTranslationRuEn(back);
+
+      setTranslating(false);
+
+      if (translated) {
+        setFront(translated);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [back, front]);
 
   useEffect(() => {
     if (!exampleEn.trim() || (exampleRu.trim() && !exampleRuAutoFilled)) return;
@@ -131,6 +157,13 @@ const audioSourceRequestRef = useRef(0);
   async function handleAudioSourceChange(source) {
   setAudioSource(source);
 
+  const requestId = ++audioSourceRequestRef.current;
+  setAudioPreview(null);
+  setAudioUrl(null);
+  setAudioFile(null);
+  setAudioFromDict(false);
+  setAudioCleared(false);
+
   const word = front.trim();
   if (!word) return;
 
@@ -138,14 +171,36 @@ const audioSourceRequestRef = useRef(0);
     await playPronunciationSource({ id: 'tts' }, word);
     return;
   }
+  if (source === 'merriam') {
+    const response = await fetch(
+      `https://english-simply.vercel.app/api/pronunciation?word=${encodeURIComponent(word)}`
+    );
 
+    if (!response.ok) return;
+
+    const data = await response.json();
+
+    if (requestId !== audioSourceRequestRef.current) return;
+
+    if (data?.audio) {
+      setAudioPreview(data.audio);
+      setAudioUrl(data.audio);
+      setAudioFile(null);
+      setAudioFromDict(false);
+      setAudioCleared(false);
+    }
+
+    return;
+  }
   if (source === 'dictionary') {
     const response = await fetch(
       `/api/dictionary-audio?word=${encodeURIComponent(word)}`
     );
 
     const data = await response.json();
-    
+
+    if (requestId !== audioSourceRequestRef.current) return;
+
     if (data?.audio) {
       setAudioPreview(data.audio);
       setAudioUrl(data.audio);
@@ -158,6 +213,9 @@ const audioSourceRequestRef = useRef(0);
   }
 
   const sources = await getPronunciationSources(word);
+
+  if (requestId !== audioSourceRequestRef.current) return;
+
   const selected = sources.find((item) => item.id === source);
 
   if (selected?.audio) {
@@ -170,13 +228,16 @@ const audioSourceRequestRef = useRef(0);
 }
   async function handleDictLookup() {
   if (!front.trim() || dictLoading) return;
+  const dictionaryWord = isRussianInput ? back.trim() : front.trim();
+
+if (!dictionaryWord) return;
 
   setDictLoading(true);
   setDictError(null);
 
   try {
     const response = await fetch(
-      `https://english-simply.vercel.app/api/pronunciation?word=${encodeURIComponent(front.trim())}`
+     `https://english-simply.vercel.app/api/pronunciation?word=${encodeURIComponent(dictionaryWord)}`
     );
 
     if (!response.ok) {
@@ -245,7 +306,7 @@ const audioSourceRequestRef = useRef(0);
       <div className="mb-3 -mt-1 flex items-center gap-2 flex-wrap">
         <button
           onClick={handleDictLookup}
-          disabled={!front.trim() || dictLoading}
+          disabled={(!front.trim() && !back.trim()) || dictLoading}
           className="dc-btn dc-tappable flex items-center gap-1.5 px-3 py-1.5 text-sm"
           style={{ background: 'var(--accent-soft)', color: 'var(--accent)', opacity: !front.trim() ? 0.5 : 1 }}
         >

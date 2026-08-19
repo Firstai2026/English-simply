@@ -243,6 +243,10 @@ export function playPronunciation(card, media) {
   const selectedSource = card?.audioSource;
 
   if (selectedSource === 'merriam') {
+    if (media && media.audio) {
+      return playAudio(media.audio);
+    }
+
     return getMerriamWebsterAudio(word)
       .then((audio) => {
         if (audio) {

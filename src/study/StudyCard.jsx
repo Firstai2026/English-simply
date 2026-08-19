@@ -19,8 +19,10 @@ export function StudyCard({
   const frontExample = isReverse ? card.exampleRu : card.exampleEn;
   const backExample = isReverse ? card.exampleEn : card.exampleRu;
   useEffect(() => {
-  if (!isReverse) playPronunciation(card, media);
-}, [card.id, direction]);
+  if (!isReverse && (!card.hasAudio || media !== undefined)) {
+    playPronunciation(card, media);
+  }
+}, [card.id, direction, media]);
 
 useEffect(() => {
   if (isReverse && flipped) playPronunciation(card, media);

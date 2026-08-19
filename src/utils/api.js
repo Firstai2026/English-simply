@@ -45,3 +45,36 @@ export async function fetchDictionaryData(word) {
       return null;
     }
   }
+    export async function fetchTranslationRuEn(word) {
+  const clean = word.trim();
+  if (!clean) return null;
+
+  try {
+    const res = await fetch(
+      'https://api.mymemory.translated.net/get?q=' +
+      encodeURIComponent(clean) +
+      '&langpair=ru|en'
+    );
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+
+    if (data && data.responseStatus && data.responseStatus !== 200) {
+      return null;
+    }
+
+    const text =
+      data &&
+      data.responseData &&
+      data.responseData.translatedText;
+
+    if (!text) return null;
+    if (/[а-яёА-ЯЁ]/.test(text)) return null;
+
+    return text;
+  } catch (e) {
+    return null;
+  }
+}
+  
